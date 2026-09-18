@@ -21,7 +21,7 @@ Requires Windows 10/11 x64. The machine does **not** need a separate .NET runtim
 - 260×110, no title bar, always on top, hidden from the taskbar (system tray).
 - Appears at the bottom-right; drag to move. Left-click the text to start a **4-answer quiz**; drag does not start a quiz.
 - Every cycle (default 5 minutes) shows either the **Chinese word** or the **Vietnamese definition**.
-- Click a choice (or press 1–4). Esc cancels. Correct → green border, “Chính xác!”, next card after 1.5s. Wrong → red border, reveal answer, same card stays.
+- Click a choice (or press 1–4). **听** / **S** plays the Chinese word (Windows TTS, offline). Esc cancels. Correct → green border, “Chính xác!”, next card after 1.5s. Wrong → red border, reveal answer, same card stays.
 - Right-click: manage words, skip to next card, set interval (1 / 3 / 5 / 10 minutes), exit.
 - Manage window: add / edit / delete, import `.csv` (`word,definition`) or `.txt` / tab-separated HSK lists.
 - Cards you miss are shown more often.

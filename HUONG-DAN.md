@@ -65,6 +65,7 @@ Dòng chữ nhỏ phía dưới (`Click → chọn nghĩa` / `Click → chọn t
    - click một nút, hoặc
    - phím **1 / 2 / 3 / 4** (cũng dùng **A / B / C / D**).
 3. **Esc** = hủy, quay về thẻ đang hiện, timer chạy tiếp.
+4. **S** hoặc nút **听** = nghe phát âm chữ Hán (kể cả khi đề đang hiện nghĩa tiếng Việt).
 
 Kết quả:
 
@@ -73,11 +74,24 @@ Kết quả:
 
 Ba đáp án nhiễu lấy từ các từ khác trong danh sách. Những từ bạn hay sai sẽ được hiện thường hơn.
 
+### Nghe phát âm
+
+Nút **听** góc trên phải (hoặc phím **S**) đọc **chữ Hán** bằng giọng có sẵn trên Windows — **không cần mạng**, không tài khoản, không file âm thanh kèm theo.
+
+Mặc định **không tự đọc** khi đổi thẻ (tránh ồn). Chuột phải → **Tự phát âm khi hiện thẻ** nếu muốn widget tự đọc mỗi lần hiện từ.
+
+**Âm thanh đúng/sai** (tiếng beep rất ngắn, nhỏ) cũng tắt mặc định. Bật trong cùng menu nếu thích.
+
+Windows cần **giọng tiếng Trung** (Cài đặt → Thời gian và ngôn ngữ → Lời nói / Speech). Máy cài tiếng Trung thường đã có. Nếu không có giọng ZH, nút 听 vẫn thử đọc nhưng có thể không rõ.
+
 ### Chuột phải (menu)
 
 - **Quản lý từ vựng** — cửa sổ thêm / sửa / xóa / import.
 - **Đổi từ khác ngay lập tức** — bỏ qua thẻ hiện tại.
 - **Chỉnh thời gian** — 1, 3, 5 hoặc 10 phút một lần đổi thẻ.
+- **Nghe phát âm** — đọc chữ Hán của thẻ đang hiện.
+- **Tự phát âm khi hiện thẻ** — bật/tắt (mặc định tắt).
+- **Âm thanh đúng/sai** — bật/tắt beep (mặc định tắt).
 - **Thoát ứng dụng**.
 
 Cùng menu đó cũng có khi chuột phải icon khay hệ thống. Double-click icon để hiện lại widget nếu đang bị khuất.
@@ -116,7 +130,9 @@ python3 -m http.server 8765 --directory preview
 
 Rồi vào `http://localhost:8765/`.
 
-Thao tác giống widget Windows: kéo để dời, click để trắc nghiệm, chuột phải để mở menu. Dữ liệu preview lưu trong trình duyệt (localStorage), **không** ghi vào `words.json` của file exe.
+Thao tác giống widget Windows: kéo để dời, **听** / phím S để nghe chữ Hán, click để trắc nghiệm, chuột phải để mở menu. Dữ liệu preview lưu trong trình duyệt (localStorage), **không** ghi vào `words.json` của file exe.
+
+Preview dùng **Web Speech API** của trình duyệt (`zh-CN`), không dùng SAPI của Windows. Chrome thường có giọng Trung; Firefox có thể không. Trình duyệt đôi khi chặn tự phát âm cho đến khi bạn click 听 một lần.
 
 ---
 
@@ -128,6 +144,7 @@ Thao tác giống widget Windows: kéo để dời, click để trắc nghiệm,
 | Click bị thành kéo | Thả chuột ngay, đừng dịch chuột khi bấm. |
 | Mất hết từ / về danh sách trống | Kiểm tra `words.json` còn cạnh `.exe` không; copy lại từ thư mục `publish`. |
 | Muốn làm lại từ đầu | Đóng app, xóa `words.json` và `settings.json` cạnh exe, copy lại `words.json` gốc rồi mở app. |
+| Không nghe được tiếng Trung | Cài giọng Chinese (Simplified) trong Windows Speech. Preview: dùng Chrome và click **听**. |
 | Máy không phải Windows | Dùng bản preview HTML ở mục 3. |
 
 Nguồn danh sách gốc trong repo: `data/hsk-vocabulary.md` (xuất ra `words.json` khi đóng gói).

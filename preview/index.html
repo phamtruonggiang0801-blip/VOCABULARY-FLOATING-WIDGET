@@ -104,6 +104,23 @@
       cursor: move;
       padding-bottom: 2px;
     }
+    #speak {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      width: 28px;
+      height: 22px;
+      border: 0;
+      border-radius: 4px;
+      background: #303236;
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      z-index: 21;
+    }
+    #speak:hover { background: #3d5a80; }
     #menu {
       position: fixed;
       display: none;
@@ -179,7 +196,7 @@
 <body>
   <div class="wallpaper-hint">
     <h1>Vocabulary Floating Widget</h1>
-    <p>HSK tiếng Trung → tiếng Việt. Kéo để di chuyển · click để trắc nghiệm 4 đáp án · chuột phải để mở menu.</p>
+    <p>HSK tiếng Trung → tiếng Việt. Nút <strong>听</strong> để nghe chữ Hán · click thẻ để trắc nghiệm 4 đáp án · chuột phải để mở menu.</p>
   </div>
   <div id="widget" role="application" aria-label="Vocabulary widget">
     <div id="content">Đang tải…</div>
@@ -187,6 +204,7 @@
       <div id="prompt"></div>
       <div id="choices"></div>
     </div>
+    <button id="speak" type="button" title="Nghe phát âm chữ Hán (phím S)">听</button>
     <div id="status">Click để trắc nghiệm</div>
   </div>
   <div id="menu"></div>
@@ -241,11 +259,15 @@
         const n = Number(localStorage.getItem("vw.minutes") || 5);
         return ALLOWED.includes(n) ? n : 5;
       },
-      saveMinutes(n) { localStorage.setItem("vw.minutes", String(n)); }
+      saveMinutes(n) { localStorage.setItem("vw.minutes", String(n)); },
+      loadFlag(key, fallback = false) { return localStorage.getItem(key) === "1" ? true : fallback; },
+      saveFlag(key, value) { localStorage.setItem(key, value ? "1" : "0"); }
     };
 
     let words = [];
     let minutes = store.loadMinutes();
+    let autoSpeak = store.loadFlag("vw.autoSpeak");
+    let feedbackSounds = store.loadFlag("vw.feedbackSounds");
     let current = null;
     let showingWord = true;
     let inQuiz = false;
@@ -327,8 +349,9 @@
         return;
       }
       content.textContent = showingWord ? current.Word : current.Definition;
-      status.textContent = showingWord ? "Click → chọn nghĩa" : "Click → chọn từ Hán";
+      status.textContent = showingWord ? "听 nghe · click quiz" : "听 chữ Hán · click quiz";
       status.style.color = "var(--muted)";
+      if (autoSpeak) speakHanzi();
     }
 
     function displayRandomWord() {
@@ -357,7 +380,7 @@
       choicesEl.innerHTML = question.options.map((opt, i) =>
         `<button type="button" data-i="${i}">${i + 1}. ${escapeHtml(opt)}</button>`
       ).join("");
-      status.textContent = "Chọn đáp án · Esc hủy";
+      status.textContent = "Chọn đáp án · Esc hủy · S nghe";
     }
 
     function cancelQuiz() {
@@ -384,6 +407,7 @@
         content.textContent = "Chính xác!";
         status.textContent = question.correct;
         status.style.color = "#90ee90";
+        playBeep(true);
         feedbackId = setTimeout(() => {
           inFeedback = false;
           setBorder(null);
@@ -395,6 +419,7 @@
         content.textContent = "Sai rồi! Đáp án: " + question.correct;
         status.textContent = "Bạn chọn: " + choice;
         status.style.color = "salmon";
+        playBeep(false);
         feedbackId = setTimeout(() => {
           inFeedback = false;
           setBorder(null);
@@ -411,6 +436,45 @@
       const i = Number(btn.dataset.i);
       grade(question.options[i]);
     });
+
+    function forSpeech(word) {
+      if (!word) return "";
+      let primary = String(word).split(/[\/|]/)[0].trim();
+      const paren = Math.min(
+        ...["（", "("].map(ch => { const i = primary.indexOf(ch); return i < 0 ? 999 : i; })
+      );
+      if (paren > 0 && paren < 999) primary = primary.slice(0, paren);
+      return primary.replace(/\s+/g, "").trim();
+    }
+
+    function speakHanzi() {
+      if (!current || !window.speechSynthesis) return;
+      const text = forSpeech(current.Word);
+      if (!text) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "zh-CN";
+      u.rate = 0.85;
+      const zh = speechSynthesis.getVoices().find(v => (v.lang || "").toLowerCase().startsWith("zh"));
+      if (zh) u.voice = zh;
+      speechSynthesis.speak(u);
+    }
+
+    function playBeep(ok) {
+      if (!feedbackSounds) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.value = 0.04;
+        osc.frequency.value = ok ? 880 : 196;
+        osc.start();
+        osc.stop(ctx.currentTime + (ok ? 0.07 : 0.09));
+        osc.onended = () => ctx.close();
+      } catch { /* ignore */ }
+    }
 
     function parseImport(text, fileName) {
       const looksCsv = /\.csv$/i.test(fileName || "") || (text.includes(",") && !text.includes("|") && !text.includes("\t"));
@@ -488,6 +552,10 @@
         <div class="item">Chỉnh thời gian</div>
         ${ALLOWED.map(m => `<button type="button" class="sub ${m === minutes ? "checked" : ""}" data-act="interval" data-min="${m}">${m} phút</button>`).join("")}
         <div class="sep"></div>
+        <button type="button" data-act="speak">Nghe phát âm</button>
+        <button type="button" class="sub ${autoSpeak ? "checked" : ""}" data-act="autoSpeak">Tự phát âm khi hiện thẻ</button>
+        <button type="button" class="sub ${feedbackSounds ? "checked" : ""}" data-act="feedbackSounds">Âm thanh đúng/sai</button>
+        <div class="sep"></div>
         <button type="button" data-act="exit">Thoát ứng dụng</button>`;
       menu.style.display = "block";
       menu.style.left = Math.min(x, innerWidth - 240) + "px";
@@ -506,6 +574,17 @@
         store.saveMinutes(minutes);
         restartTimer();
         showToast("Chu kỳ: " + minutes + " phút");
+      }
+      if (act === "speak") speakHanzi();
+      if (act === "autoSpeak") {
+        autoSpeak = !autoSpeak;
+        store.saveFlag("vw.autoSpeak", autoSpeak);
+        showToast(autoSpeak ? "Tự phát âm: bật" : "Tự phát âm: tắt");
+      }
+      if (act === "feedbackSounds") {
+        feedbackSounds = !feedbackSounds;
+        store.saveFlag("vw.feedbackSounds", feedbackSounds);
+        showToast(feedbackSounds ? "Âm thanh đúng/sai: bật" : "Âm thanh đúng/sai: tắt");
       }
       if (act === "exit") {
         widget.style.display = "none";
@@ -528,6 +607,7 @@
       widget.style.top = (innerHeight - 110 - 40) + "px";
     }
     function onDown(e) {
+      if (e.target.closest("#speak") || e.target.closest("#choices")) return;
       if (e.button !== 0 || inQuiz) return;
       dragging = true; moved = false;
       startX = e.clientX; startY = e.clientY;
@@ -551,7 +631,19 @@
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
 
+    document.getElementById("speak").addEventListener("mousedown", (e) => e.stopPropagation());
+    document.getElementById("speak").addEventListener("click", (e) => {
+      e.stopPropagation();
+      speakHanzi();
+    });
+
     document.addEventListener("keydown", (e) => {
+      if (e.key === "s" || e.key === "S") {
+        if (e.target && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+        e.preventDefault();
+        speakHanzi();
+        return;
+      }
       if (!inQuiz || !question) return;
       if (e.key === "Escape") { e.preventDefault(); cancelQuiz(); return; }
       const map = { "1": 0, "2": 1, "3": 2, "4": 3, a: 0, b: 1, c: 2, d: 3 };
@@ -607,6 +699,10 @@
       } catch { /* preview without server */ }
       words = store.loadWords(bundled);
       if (!words.length) words = bundled;
+      if (window.speechSynthesis) {
+        speechSynthesis.getVoices();
+        speechSynthesis.addEventListener("voiceschanged", () => speechSynthesis.getVoices());
+      }
       placeDefault();
       displayRandomWord();
       restartTimer();
