@@ -56,3 +56,4 @@ WinForms UI lives in `VocabularyWidget/`; domain logic (JSON, matching, import, 
   "CorrectCount": 0
 }
 ```
+# VOCABULARY-FLOATING-WIDGET
