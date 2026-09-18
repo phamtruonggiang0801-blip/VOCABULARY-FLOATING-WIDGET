@@ -77,6 +77,7 @@ public class DataService
             string json = File.ReadAllText(_settingsPath);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
             settings.SetTimerMinutes(settings.TimerMinutes);
+            settings.SetMode(settings.GetMode());
             return settings;
         }
         catch

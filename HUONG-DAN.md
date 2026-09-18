@@ -1,6 +1,6 @@
 # Hướng dẫn cài đặt và sử dụng — Vocabulary Floating Widget
 
-Widget nổi trên Windows để ôn **từ HSK tiếng Trung → nghĩa tiếng Việt**. Bấm vào thẻ là **trắc nghiệm 4 đáp án** (không gõ chữ). Khoảng 496 từ đi kèm sẵn.
+Widget nổi trên Windows để ôn **từ HSK tiếng Trung → nghĩa tiếng Việt**. Có bốn chế độ: **trắc nghiệm 4 đáp án**, **nghe** (tự phát âm), **làm việc** (thanh chữ chạy trên đỉnh màn hình), **viết** (gõ một từ). Khoảng 496 từ đi kèm sẵn.
 
 Ứng dụng **không cần cài đặt**, **không cần quyền Administrator**, **không cần cài .NET** trên máy dùng.
 
@@ -30,7 +30,7 @@ Cùng thư mục đó có `words.json` (danh sách từ). Copy **cả thư mục
 2. Widget nhỏ (~260×110) hiện góc dưới bên phải, luôn nổi trên cửa sổ khác, **không hiện trên thanh Taskbar** (có icon khay hệ thống).
 3. Lần đầu dùng, dữ liệu lấy từ `words.json` **nằm cạnh file .exe**.
 
-Khi bạn ôn bài, số lần ôn / số lần đúng được ghi lại vào `words.json`. Thời gian đổi thẻ (1 / 3 / 5 / 10 phút) lưu trong `settings.json`, cũng **cạnh file .exe**.
+Khi bạn ôn bài, số lần ôn / số lần đúng được ghi lại vào `words.json`. Thời gian đổi thẻ, chế độ đang chọn, và tùy chọn âm thanh lưu trong `settings.json`, cũng **cạnh file .exe**.
 
 Giữ `words.json` đi cùng `.exe`. Nếu chỉ copy mỗi file exe sang máy khác, danh sách từ và tiến độ ôn sẽ mất.
 
@@ -47,7 +47,7 @@ Thoát: chuột phải widget → **Thoát ứng dụng**, hoặc chuột phải
 | Thao tác | Kết quả |
 |---|---|
 | Nhấn giữ chuột trái rồi **kéo** | Di chuyển widget. Không mở quiz. |
-| **Click** (không kéo) vào chữ | Mở trắc nghiệm 4 đáp án. |
+| **Click** (không kéo) vào chữ | Mở trắc nghiệm 4 đáp án (chỉ **chế độ Trắc nghiệm**). |
 
 ### Thẻ đang hiện
 
@@ -74,6 +74,22 @@ Kết quả:
 
 Ba đáp án nhiễu lấy từ các từ khác trong danh sách. Những từ bạn hay sai sẽ được hiện thường hơn.
 
+### Bốn chế độ (chuột phải → Chế độ)
+
+Mặc định là **Trắc nghiệm** như trên. Đổi chế độ bất cứ lúc nào; lựa chọn được lưu trong `settings.json`.
+
+#### Chế độ nghe
+
+Widget vẫn nhỏ (~260×110). **Tự chạy**: khoảng **10 giây** đổi một từ ngẫu nhiên và **tự đọc chữ Hán** (SAPI, không cần bấm 听). Phù hợp nghe rảnh tay. Click vào thẻ **không** mở quiz. Kéo để dời vị trí vẫn được. 听 / S vẫn đọc lại nếu muốn.
+
+#### Chế độ làm việc
+
+Một **thanh ngang trên đỉnh màn hình** (full chiều rộng, cao khoảng 64px). Chữ Hán và nghĩa tiếng Việt **chạy từ trái sang phải**. Cỡ chữ khoảng **26pt** — to rõ hơn nhiều so với widget 260×110 (12pt). Khoảng **20 giây** đổi thẻ. Thanh này **ghim trên cùng**, không kéo dời. 听 / S vẫn nghe được.
+
+#### Chế độ viết
+
+Hiện đề (chữ Hán hoặc nghĩa Việt) và ô gõ. **Không cần gõ đúng cả cụm** — trùng **một từ** trong đáp án là đủ (ví dụ nghĩa `Yêu; thương; yêu quý` thì gõ `thương` được tính đúng). Enter gửi; Esc xóa ô. Đúng/sai giống quiz (viền xanh/đỏ). Timer tạm dừng khi đang chờ bạn gõ.
+
 ### Nghe phát âm
 
 Nút **听** góc trên phải (hoặc phím **S**) đọc **chữ Hán** bằng giọng có sẵn trên Windows — **không cần mạng**, không tài khoản, không file âm thanh kèm theo.
@@ -88,9 +104,10 @@ Windows cần **giọng tiếng Trung** (Cài đặt → Thời gian và ngôn n
 
 - **Quản lý từ vựng** — cửa sổ thêm / sửa / xóa / import.
 - **Đổi từ khác ngay lập tức** — bỏ qua thẻ hiện tại.
-- **Chỉnh thời gian** — 1, 3, 5 hoặc 10 phút một lần đổi thẻ.
+- **Chế độ** — Trắc nghiệm / Nghe / Làm việc / Viết.
+- **Chỉnh thời gian** — 1, 3, 5 hoặc 10 phút một lần đổi thẻ (áp dụng chế độ trắc nghiệm).
 - **Nghe phát âm** — đọc chữ Hán của thẻ đang hiện.
-- **Tự phát âm khi hiện thẻ** — bật/tắt (mặc định tắt).
+- **Tự phát âm khi hiện thẻ** — bật/tắt (mặc định tắt; chế độ nghe thì luôn tự đọc).
 - **Âm thanh đúng/sai** — bật/tắt beep (mặc định tắt).
 - **Thoát ứng dụng**.
 
@@ -120,7 +137,7 @@ word,definition
 
 ## 3. Xem trước HTML (không phải Windows)
 
-`preview/index.html` chỉ là **bản demo hành vi** (cùng kiểu trắc nghiệm 4 đáp án, cùng danh sách HSK) khi bạn không có Windows. **Đây không phải app cài cho máy học**.
+`preview/index.html` chỉ là **bản demo hành vi** (cùng 4 chế độ, cùng danh sách HSK) khi bạn không có Windows. **Đây không phải app cài cho máy học**.
 
 Mở file bằng trình duyệt, hoặc từ thư mục repo:
 
@@ -130,7 +147,7 @@ python3 -m http.server 8765 --directory preview
 
 Rồi vào `http://localhost:8765/`.
 
-Thao tác giống widget Windows: kéo để dời, **听** / phím S để nghe chữ Hán, click để trắc nghiệm, chuột phải để mở menu. Dữ liệu preview lưu trong trình duyệt (localStorage), **không** ghi vào `words.json` của file exe.
+Thao tác giống widget Windows: kéo để dời, **听** / phím S để nghe chữ Hán, click để trắc nghiệm, chuột phải → **Chế độ** để chuyển Nghe / Làm việc / Viết. Dữ liệu preview lưu trong trình duyệt (localStorage), **không** ghi vào `words.json` của file exe.
 
 Preview dùng **Web Speech API** của trình duyệt (`zh-CN`), không dùng SAPI của Windows. Chrome thường có giọng Trung; Firefox có thể không. Trình duyệt đôi khi chặn tự phát âm cho đến khi bạn click 听 một lần.
 
