@@ -14,7 +14,7 @@
       --muted: #a0a0a0;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; font-family: "Segoe UI", system-ui, sans-serif; }
+    html, body { margin: 0; height: 100%; font-family: "Microsoft YaHei UI", "Noto Sans SC", "Noto Sans CJK SC", "Segoe UI", system-ui, sans-serif; }
     body {
       background:
         linear-gradient(180deg, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.55)),
@@ -48,6 +48,7 @@
     }
     #widget.ok { border-color: var(--ok); }
     #widget.bad { border-color: var(--bad); }
+    #widget.quiz { width: 300px; height: 252px; }
     #content {
       flex: 1;
       display: flex;
@@ -55,21 +56,46 @@
       justify-content: center;
       text-align: center;
       padding: 8px 12px 0;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 700;
       cursor: pointer;
       word-break: break-word;
     }
     #content.ok { color: var(--ok); }
     #content.bad { color: #ffa096; }
-    #answer {
+    #quiz {
       display: none;
-      margin: 28px 18px 0;
-      width: calc(100% - 36px);
-      font-size: 15px;
-      padding: 4px 6px;
-      border: 1px solid #888;
+      flex: 1;
+      flex-direction: column;
+      padding: 4px 8px 6px;
+      gap: 4px;
+      min-height: 0;
     }
+    #prompt {
+      text-align: center;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 4px 4px 2px;
+    }
+    #choices {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+    #choices button {
+      text-align: left;
+      background: #303236;
+      color: #fff;
+      border: 0;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      line-height: 1.25;
+    }
+    #choices button:hover { background: #3d5a80; }
     #status {
       height: 22px;
       font-size: 12px;
@@ -153,12 +179,15 @@
 <body>
   <div class="wallpaper-hint">
     <h1>Vocabulary Floating Widget</h1>
-    <p>Widget 260×110, luôn nổi. Kéo để di chuyển · click để kiểm tra · chuột phải để mở menu. Bản xem trước hành vi (cùng state machine với app WinForms).</p>
+    <p>HSK tiếng Trung → tiếng Việt. Kéo để di chuyển · click để trắc nghiệm 4 đáp án · chuột phải để mở menu.</p>
   </div>
   <div id="widget" role="application" aria-label="Vocabulary widget">
     <div id="content">Đang tải…</div>
-    <input id="answer" autocomplete="off" />
-    <div id="status">Click để kiểm tra</div>
+    <div id="quiz">
+      <div id="prompt"></div>
+      <div id="choices"></div>
+    </div>
+    <div id="status">Click để trắc nghiệm</div>
   </div>
   <div id="menu"></div>
   <div id="overlay">
@@ -173,8 +202,8 @@
         </table>
       </div>
       <div class="mgr-bottom">
-        <input id="newWord" placeholder="Từ mới" />
-        <input id="newDef" placeholder="Định nghĩa" style="min-width:220px;flex:1" />
+        <input id="newWord" placeholder="Từ Hán (爱)" />
+        <input id="newDef" placeholder="Nghĩa tiếng Việt" style="min-width:220px;flex:1" />
         <button id="btnAdd" type="button">Thêm</button>
         <button id="btnDelete" type="button">Xóa</button>
         <button id="btnImport" type="button">Import CSV/TXT</button>
@@ -185,17 +214,13 @@
   </div>
   <div id="toast"></div>
   <script>
-    const SEED = [
-      { Id: "1", Word: "resilient", Definition: "kiên cường, có khả năng phục hồi nhanh", ReviewCount: 0, CorrectCount: 0 },
-      { Id: "2", Word: "ubiquitous", Definition: "có mặt ở khắp mọi nơi, phổ biến", ReviewCount: 0, CorrectCount: 0 },
-      { Id: "3", Word: "diligent", Definition: "chăm chỉ, siêng năng", ReviewCount: 0, CorrectCount: 0 },
-      { Id: "4", Word: "innovative", Definition: "đổi mới, sáng tạo", ReviewCount: 0, CorrectCount: 0 },
-      { Id: "5", Word: "perspective", Definition: "góc nhìn, quan điểm", ReviewCount: 0, CorrectCount: 0 }
-    ];
+    const STORE_KEY = "vw.words.hsk1";
     const ALLOWED = [1, 3, 5, 10];
     const widget = document.getElementById("widget");
     const content = document.getElementById("content");
-    const answer = document.getElementById("answer");
+    const quizEl = document.getElementById("quiz");
+    const promptEl = document.getElementById("prompt");
+    const choicesEl = document.getElementById("choices");
     const status = document.getElementById("status");
     const menu = document.getElementById("menu");
     const overlay = document.getElementById("overlay");
@@ -203,11 +228,15 @@
     const toast = document.getElementById("toast");
 
     const store = {
-      loadWords() {
-        try { return JSON.parse(localStorage.getItem("vw.words")) || structuredClone(SEED); }
-        catch { return structuredClone(SEED); }
+      loadWords(fallback) {
+        try {
+          const raw = localStorage.getItem(STORE_KEY);
+          if (!raw) return fallback;
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) && parsed.length >= 50 ? parsed : fallback;
+        } catch { return fallback; }
       },
-      saveWords(list) { localStorage.setItem("vw.words", JSON.stringify(list)); },
+      saveWords(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); },
       loadMinutes() {
         const n = Number(localStorage.getItem("vw.minutes") || 5);
         return ALLOWED.includes(n) ? n : 5;
@@ -215,12 +244,13 @@
       saveMinutes(n) { localStorage.setItem("vw.minutes", String(n)); }
     };
 
-    let words = store.loadWords();
+    let words = [];
     let minutes = store.loadMinutes();
     let current = null;
     let showingWord = true;
     let inQuiz = false;
     let inFeedback = false;
+    let question = null;
     let timerId = null;
     let feedbackId = null;
     let selectedId = null;
@@ -242,8 +272,22 @@
       return pool[pool.length - 1];
     }
 
-    function normalize(s) {
-      return (s || "").trim().replace(/\s+/g, " ").toLowerCase();
+    function buildQuestion(item, showWord) {
+      const prompt = showWord ? item.Word : item.Definition;
+      const correct = showWord ? item.Definition : item.Word;
+      const seen = new Set([correct]);
+      const distractors = [];
+      const shuffled = words.slice().sort(() => Math.random() - 0.5);
+      for (const w of shuffled) {
+        if (w.Id === item.Id) continue;
+        const text = showWord ? w.Definition : w.Word;
+        if (!text || seen.has(text)) continue;
+        seen.add(text);
+        distractors.push(text);
+        if (distractors.length === 3) break;
+      }
+      const options = [correct, ...distractors].sort(() => Math.random() - 0.5);
+      return { prompt, correct, options };
     }
 
     function setBorder(kind) {
@@ -255,9 +299,27 @@
       }
     }
 
+    function idleSize() {
+      const right = widget.offsetLeft + widget.offsetWidth;
+      const bottom = widget.offsetTop + widget.offsetHeight;
+      widget.classList.remove("quiz");
+      widget.style.left = (right - widget.offsetWidth) + "px";
+      widget.style.top = (bottom - widget.offsetHeight) + "px";
+    }
+
+    function quizSize() {
+      const right = widget.offsetLeft + widget.offsetWidth;
+      const bottom = widget.offsetTop + widget.offsetHeight;
+      widget.classList.add("quiz");
+      widget.style.left = (right - widget.offsetWidth) + "px";
+      widget.style.top = (bottom - widget.offsetHeight) + "px";
+    }
+
     function showPrompt() {
       inQuiz = false;
-      answer.style.display = "none";
+      question = null;
+      idleSize();
+      quizEl.style.display = "none";
       content.style.display = "flex";
       if (!current) {
         content.textContent = "Chưa có từ vựng!";
@@ -265,7 +327,7 @@
         return;
       }
       content.textContent = showingWord ? current.Word : current.Definition;
-      status.textContent = showingWord ? "Nhập định nghĩa..." : "Nhập từ vựng...";
+      status.textContent = showingWord ? "Click → chọn nghĩa" : "Click → chọn từ Hán";
       status.style.color = "var(--muted)";
     }
 
@@ -285,13 +347,17 @@
 
     function startQuiz() {
       if (!current || inQuiz || inFeedback) return;
+      question = buildQuestion(current, showingWord);
       inQuiz = true;
       clearInterval(timerId);
       content.style.display = "none";
-      answer.style.display = "block";
-      answer.value = "";
-      answer.focus();
-      status.textContent = "Enter = gửi · Esc = hủy";
+      quizEl.style.display = "flex";
+      quizSize();
+      promptEl.textContent = question.prompt;
+      choicesEl.innerHTML = question.options.map((opt, i) =>
+        `<button type="button" data-i="${i}">${i + 1}. ${escapeHtml(opt)}</button>`
+      ).join("");
+      status.textContent = "Chọn đáp án · Esc hủy";
     }
 
     function cancelQuiz() {
@@ -302,22 +368,21 @@
       restartTimer();
     }
 
-    function checkAnswer() {
-      if (!current) return;
-      const target = showingWord ? current.Definition : current.Word;
-      const input = answer.value;
-      const ok = normalize(input) === normalize(target);
+    function grade(choice) {
+      if (!current || !question) return;
+      const ok = choice === question.correct;
       current.ReviewCount = (current.ReviewCount || 0) + 1;
       if (ok) current.CorrectCount = (current.CorrectCount || 0) + 1;
       store.saveWords(words);
       inQuiz = false;
       inFeedback = true;
-      answer.style.display = "none";
+      idleSize();
+      quizEl.style.display = "none";
       content.style.display = "flex";
       if (ok) {
         setBorder("ok");
         content.textContent = "Chính xác!";
-        status.textContent = target;
+        status.textContent = question.correct;
         status.style.color = "#90ee90";
         feedbackId = setTimeout(() => {
           inFeedback = false;
@@ -327,8 +392,8 @@
         }, 1500);
       } else {
         setBorder("bad");
-        content.textContent = "Sai rồi! Đáp án: " + target;
-        status.textContent = input.trim() ? ("Bạn đã nhập: " + input.trim()) : "Bạn chưa nhập gì";
+        content.textContent = "Sai rồi! Đáp án: " + question.correct;
+        status.textContent = "Bạn chọn: " + choice;
         status.style.color = "salmon";
         feedbackId = setTimeout(() => {
           inFeedback = false;
@@ -338,6 +403,14 @@
         }, 2000);
       }
     }
+
+    choicesEl.addEventListener("mousedown", (e) => e.stopPropagation());
+    choicesEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn || !question) return;
+      const i = Number(btn.dataset.i);
+      grade(question.options[i]);
+    });
 
     function parseImport(text, fileName) {
       const looksCsv = /\.csv$/i.test(fileName || "") || (text.includes(",") && !text.includes("|") && !text.includes("\t"));
@@ -478,9 +551,14 @@
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
 
-    answer.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { e.preventDefault(); cancelQuiz(); }
-      if (e.key === "Enter") { e.preventDefault(); checkAnswer(); }
+    document.addEventListener("keydown", (e) => {
+      if (!inQuiz || !question) return;
+      if (e.key === "Escape") { e.preventDefault(); cancelQuiz(); return; }
+      const map = { "1": 0, "2": 1, "3": 2, "4": 3, a: 0, b: 1, c: 2, d: 3 };
+      const idx = map[e.key.toLowerCase()];
+      if (idx === undefined || idx >= question.options.length) return;
+      e.preventDefault();
+      grade(question.options[idx]);
     });
 
     document.getElementById("btnAdd").onclick = () => {
@@ -508,10 +586,10 @@
       if (!file) return;
       const text = await file.text();
       const imported = parseImport(text, file.name);
-      const have = new Set(words.map(w => w.Word.trim().toLowerCase()));
+      const have = new Set(words.map(w => w.Word.trim() + "\n" + w.Definition.trim()));
       let added = 0;
       for (const item of imported) {
-        const key = item.Word.trim().toLowerCase();
+        const key = item.Word.trim() + "\n" + item.Definition.trim();
         if (!have.has(key)) { have.add(key); words.push(item); added++; }
       }
       store.saveWords(words);
@@ -521,9 +599,19 @@
     };
     document.getElementById("btnClose").onclick = () => overlay.classList.remove("open");
 
-    placeDefault();
-    displayRandomWord();
-    restartTimer();
+    async function boot() {
+      let bundled = [];
+      try {
+        const res = await fetch("words.json");
+        if (res.ok) bundled = await res.json();
+      } catch { /* preview without server */ }
+      words = store.loadWords(bundled);
+      if (!words.length) words = bundled;
+      placeDefault();
+      displayRandomWord();
+      restartTimer();
+    }
+    boot();
     window.addEventListener("resize", () => {
       const r = widget.getBoundingClientRect();
       if (r.right > innerWidth || r.bottom > innerHeight) placeDefault();
