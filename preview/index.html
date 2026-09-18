@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vocabulary Floating Widget — preview</title>
+  <style>
+    :root {
+      --bg: #1a1c22;
+      --widget: #202124;
+      --border: #46484c;
+      --ok: #2ecc71;
+      --bad: #e74c3c;
+      --muted: #a0a0a0;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: "Segoe UI", system-ui, sans-serif; }
+    body {
+      background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.55)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect fill='%23344760' width='120' height='120'/%3E%3Ccircle cx='20' cy='20' r='40' fill='%232c3e50' opacity='.4'/%3E%3C/svg%3E");
+      background-color: #2c3e50;
+      color: #e8eaed;
+      overflow: hidden;
+    }
+    .wallpaper-hint {
+      position: absolute;
+      left: 28px;
+      top: 24px;
+      max-width: 420px;
+      opacity: 0.9;
+    }
+    .wallpaper-hint h1 { font-size: 22px; margin: 0 0 8px; font-weight: 600; }
+    .wallpaper-hint p { margin: 0; color: #cbd5e1; font-size: 14px; line-height: 1.45; }
+    #widget {
+      position: fixed;
+      width: 260px;
+      height: 110px;
+      background: var(--widget);
+      color: #fff;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 10px 28px rgba(0,0,0,.45);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      z-index: 20;
+    }
+    #widget.ok { border-color: var(--ok); }
+    #widget.bad { border-color: var(--bad); }
+    #content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8px 12px 0;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      word-break: break-word;
+    }
+    #content.ok { color: var(--ok); }
+    #content.bad { color: #ffa096; }
+    #answer {
+      display: none;
+      margin: 28px 18px 0;
+      width: calc(100% - 36px);
+      font-size: 15px;
+      padding: 4px 6px;
+      border: 1px solid #888;
+    }
+    #status {
+      height: 22px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      cursor: move;
+      padding-bottom: 2px;
+    }
+    #menu {
+      position: fixed;
+      display: none;
+      background: #2b2d31;
+      border: 1px solid #444;
+      min-width: 220px;
+      z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      padding: 4px 0;
+    }
+    #menu button, #menu .item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: 0;
+      color: #eee;
+      padding: 8px 14px;
+      font: inherit;
+      cursor: pointer;
+    }
+    #menu button:hover, #menu .item:hover { background: #3d5a80; }
+    #menu .sep { height: 1px; background: #555; margin: 4px 0; }
+    #menu .sub { padding-left: 22px; font-size: 13px; color: #ddd; }
+    #menu .sub.checked::before { content: "✓ "; }
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+    }
+    #overlay.open { display: flex; }
+    #manager {
+      width: min(720px, 94vw);
+      max-height: 86vh;
+      background: #f5f5f7;
+      color: #222;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #manager h2 { margin: 0; padding: 14px 16px; font-size: 16px; background: #e8e8ee; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 8px 10px; text-align: left; }
+    th { background: #eee; }
+    .grid-wrap { overflow: auto; flex: 1; background: #fff; }
+    .mgr-bottom { padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .mgr-bottom input { padding: 6px 8px; font: inherit; }
+    .mgr-bottom button { padding: 6px 12px; font: inherit; cursor: pointer; }
+    tr.selected { background: #dbeafe; }
+    #toast {
+      position: fixed;
+      left: 50%;
+      top: 64px;
+      transform: translateX(-50%);
+      background: #111827;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity .2s;
+      z-index: 80;
+      pointer-events: none;
+      box-shadow: 0 8px 20px rgba(0,0,0,.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="wallpaper-hint">
+    <h1>Vocabulary Floating Widget</h1>
+    <p>Widget 260×110, luôn nổi. Kéo để di chuyển · click để kiểm tra · chuột phải để mở menu. Bản xem trước hành vi (cùng state machine với app WinForms).</p>
+  </div>
+  <div id="widget" role="application" aria-label="Vocabulary widget">
+    <div id="content">Đang tải…</div>
+    <input id="answer" autocomplete="off" />
+    <div id="status">Click để kiểm tra</div>
+  </div>
+  <div id="menu"></div>
+  <div id="overlay">
+    <div id="manager">
+      <h2>Quản lý từ vựng</h2>
+      <div class="grid-wrap">
+        <table>
+          <thead>
+            <tr><th>Từ vựng</th><th>Định nghĩa</th><th>Ôn</th><th>Đúng</th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="mgr-bottom">
+        <input id="newWord" placeholder="Từ mới" />
+        <input id="newDef" placeholder="Định nghĩa" style="min-width:220px;flex:1" />
+        <button id="btnAdd" type="button">Thêm</button>
+        <button id="btnDelete" type="button">Xóa</button>
+        <button id="btnImport" type="button">Import CSV/TXT</button>
+        <input id="fileImport" type="file" accept=".csv,.txt,text/plain" hidden />
+        <button id="btnClose" type="button">Đóng</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+  <script>
+    const SEED = [
+      { Id: "1", Word: "resilient", Definition: "kiên cường, có khả năng phục hồi nhanh", ReviewCount: 0, CorrectCount: 0 },
+      { Id: "2", Word: "ubiquitous", Definition: "có mặt ở khắp mọi nơi, phổ biến", ReviewCount: 0, CorrectCount: 0 },
+      { Id: "3", Word: "diligent", Definition: "chăm chỉ, siêng năng", ReviewCount: 0, CorrectCount: 0 },
+      { Id: "4", Word: "innovative", Definition: "đổi mới, sáng tạo", ReviewCount: 0, CorrectCount: 0 },
+      { Id: "5", Word: "perspective", Definition: "góc nhìn, quan điểm", ReviewCount: 0, CorrectCount: 0 }
+    ];
+    const ALLOWED = [1, 3, 5, 10];
+    const widget = document.getElementById("widget");
+    const content = document.getElementById("content");
+    const answer = document.getElementById("answer");
+    const status = document.getElementById("status");
+    const menu = document.getElementById("menu");
+    const overlay = document.getElementById("overlay");
+    const rows = document.getElementById("rows");
+    const toast = document.getElementById("toast");
+
+    const store = {
+      loadWords() {
+        try { return JSON.parse(localStorage.getItem("vw.words")) || structuredClone(SEED); }
+        catch { return structuredClone(SEED); }
+      },
+      saveWords(list) { localStorage.setItem("vw.words", JSON.stringify(list)); },
+      loadMinutes() {
+        const n = Number(localStorage.getItem("vw.minutes") || 5);
+        return ALLOWED.includes(n) ? n : 5;
+      },
+      saveMinutes(n) { localStorage.setItem("vw.minutes", String(n)); }
+    };
+
+    let words = store.loadWords();
+    let minutes = store.loadMinutes();
+    let current = null;
+    let showingWord = true;
+    let inQuiz = false;
+    let inFeedback = false;
+    let timerId = null;
+    let feedbackId = null;
+    let selectedId = null;
+    let lastId = null;
+
+    function missCount(w) { return Math.max(0, (w.ReviewCount || 0) - (w.CorrectCount || 0)); }
+
+    function pickNext() {
+      if (!words.length) return null;
+      let pool = words.length > 1 ? words.filter(w => w.Id !== lastId) : words;
+      if (!pool.length) pool = words;
+      const weights = pool.map(w => 1 + 3 * missCount(w));
+      let total = weights.reduce((a, b) => a + b, 0);
+      let roll = Math.random() * total;
+      for (let i = 0; i < pool.length; i++) {
+        roll -= weights[i];
+        if (roll <= 0) return pool[i];
+      }
+      return pool[pool.length - 1];
+    }
+
+    function normalize(s) {
+      return (s || "").trim().replace(/\s+/g, " ").toLowerCase();
+    }
+
+    function setBorder(kind) {
+      widget.classList.remove("ok", "bad");
+      content.classList.remove("ok", "bad");
+      if (kind) {
+        widget.classList.add(kind);
+        content.classList.add(kind);
+      }
+    }
+
+    function showPrompt() {
+      inQuiz = false;
+      answer.style.display = "none";
+      content.style.display = "flex";
+      if (!current) {
+        content.textContent = "Chưa có từ vựng!";
+        status.textContent = "Chuột phải → Quản lý từ vựng";
+        return;
+      }
+      content.textContent = showingWord ? current.Word : current.Definition;
+      status.textContent = showingWord ? "Nhập định nghĩa..." : "Nhập từ vựng...";
+      status.style.color = "var(--muted)";
+    }
+
+    function displayRandomWord() {
+      inFeedback = false;
+      setBorder(null);
+      current = pickNext();
+      lastId = current ? current.Id : null;
+      showingWord = Math.random() < 0.5;
+      showPrompt();
+    }
+
+    function restartTimer() {
+      clearInterval(timerId);
+      timerId = setInterval(displayRandomWord, minutes * 60 * 1000);
+    }
+
+    function startQuiz() {
+      if (!current || inQuiz || inFeedback) return;
+      inQuiz = true;
+      clearInterval(timerId);
+      content.style.display = "none";
+      answer.style.display = "block";
+      answer.value = "";
+      answer.focus();
+      status.textContent = "Enter = gửi · Esc = hủy";
+    }
+
+    function cancelQuiz() {
+      clearTimeout(feedbackId);
+      inFeedback = false;
+      setBorder(null);
+      showPrompt();
+      restartTimer();
+    }
+
+    function checkAnswer() {
+      if (!current) return;
+      const target = showingWord ? current.Definition : current.Word;
+      const input = answer.value;
+      const ok = normalize(input) === normalize(target);
+      current.ReviewCount = (current.ReviewCount || 0) + 1;
+      if (ok) current.CorrectCount = (current.CorrectCount || 0) + 1;
+      store.saveWords(words);
+      inQuiz = false;
+      inFeedback = true;
+      answer.style.display = "none";
+      content.style.display = "flex";
+      if (ok) {
+        setBorder("ok");
+        content.textContent = "Chính xác!";
+        status.textContent = target;
+        status.style.color = "#90ee90";
+        feedbackId = setTimeout(() => {
+          inFeedback = false;
+          setBorder(null);
+          displayRandomWord();
+          restartTimer();
+        }, 1500);
+      } else {
+        setBorder("bad");
+        content.textContent = "Sai rồi! Đáp án: " + target;
+        status.textContent = input.trim() ? ("Bạn đã nhập: " + input.trim()) : "Bạn chưa nhập gì";
+        status.style.color = "salmon";
+        feedbackId = setTimeout(() => {
+          inFeedback = false;
+          setBorder(null);
+          showPrompt();
+          restartTimer();
+        }, 2000);
+      }
+    }
+
+    function parseImport(text, fileName) {
+      const looksCsv = /\.csv$/i.test(fileName || "") || (text.includes(",") && !text.includes("|") && !text.includes("\t"));
+      const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map(l => l.trim()).filter(Boolean);
+      const header = /^(word,definition|word,meaning|word\|definition|word\tdefinition)$/i;
+      const start = lines[0] && header.test(lines[0]) ? 1 : 0;
+      const items = [];
+      for (let i = start; i < lines.length; i++) {
+        const line = lines[i];
+        let parts;
+        if (looksCsv && line.includes(",")) parts = splitCsv(line);
+        else if (line.includes("\t")) parts = line.split("\t");
+        else if (line.includes("|")) parts = line.split("|");
+        else if (line.includes(" - ")) parts = line.split(" - ");
+        else if (line.includes(",")) parts = splitCsv(line);
+        else continue;
+        if (parts.length < 2) continue;
+        const word = unquote(parts[0]).trim();
+        const definition = unquote(parts.slice(1).join(looksCsv ? "," : "|")).trim();
+        if (word && definition) items.push({ Id: crypto.randomUUID(), Word: word, Definition: definition, ReviewCount: 0, CorrectCount: 0 });
+      }
+      return items;
+    }
+
+    function splitCsv(line) {
+      const result = [];
+      let cur = "", inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === "," && !inQ) { result.push(cur); cur = ""; }
+        else cur += c;
+      }
+      result.push(cur);
+      return result;
+    }
+    function unquote(v) {
+      v = v.trim();
+      if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) return v.slice(1, -1).replace(/""/g, '"');
+      return v;
+    }
+
+    function renderManager() {
+      rows.innerHTML = words.map(w => `<tr data-id="${w.Id}">
+        <td>${escapeHtml(w.Word)}</td>
+        <td>${escapeHtml(w.Definition)}</td>
+        <td>${w.ReviewCount || 0}</td>
+        <td>${w.CorrectCount || 0}</td>
+      </tr>`).join("");
+      [...rows.querySelectorAll("tr")].forEach(tr => {
+        if (tr.dataset.id === selectedId) tr.classList.add("selected");
+        tr.addEventListener("click", () => {
+          selectedId = tr.dataset.id;
+          renderManager();
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.style.opacity = "1";
+      setTimeout(() => toast.style.opacity = "0", 3000);
+    }
+
+    function openMenu(x, y) {
+      menu.innerHTML = `
+        <button type="button" data-act="manage">Quản lý từ vựng</button>
+        <button type="button" data-act="next">Đổi từ khác ngay lập tức</button>
+        <div class="item">Chỉnh thời gian</div>
+        ${ALLOWED.map(m => `<button type="button" class="sub ${m === minutes ? "checked" : ""}" data-act="interval" data-min="${m}">${m} phút</button>`).join("")}
+        <div class="sep"></div>
+        <button type="button" data-act="exit">Thoát ứng dụng</button>`;
+      menu.style.display = "block";
+      menu.style.left = Math.min(x, innerWidth - 240) + "px";
+      menu.style.top = Math.min(y, innerHeight - 260) + "px";
+    }
+
+    menu.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const act = btn.dataset.act;
+      menu.style.display = "none";
+      if (act === "manage") { overlay.classList.add("open"); renderManager(); }
+      if (act === "next") { clearTimeout(feedbackId); displayRandomWord(); restartTimer(); }
+      if (act === "interval") {
+        minutes = Number(btn.dataset.min);
+        store.saveMinutes(minutes);
+        restartTimer();
+        showToast("Chu kỳ: " + minutes + " phút");
+      }
+      if (act === "exit") {
+        widget.style.display = "none";
+        showToast("Widget đã đóng (preview). Tải lại trang để mở lại.");
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) menu.style.display = "none";
+    });
+
+    widget.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openMenu(e.clientX, e.clientY);
+    });
+
+    let dragging = false, moved = false, dx = 0, dy = 0, startX = 0, startY = 0, origL = 0, origT = 0;
+    function placeDefault() {
+      widget.style.left = (innerWidth - 260 - 20) + "px";
+      widget.style.top = (innerHeight - 110 - 40) + "px";
+    }
+    function onDown(e) {
+      if (e.button !== 0 || inQuiz) return;
+      dragging = true; moved = false;
+      startX = e.clientX; startY = e.clientY;
+      origL = widget.offsetLeft; origT = widget.offsetTop;
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      dx = e.clientX - startX; dy = e.clientY - startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      if (moved) {
+        widget.style.left = (origL + dx) + "px";
+        widget.style.top = (origT + dy) + "px";
+      }
+    }
+    function onUp(e) {
+      if (!dragging) return;
+      dragging = false;
+      if (!moved && e.button === 0 && !inFeedback) startQuiz();
+    }
+    widget.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+
+    answer.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); cancelQuiz(); }
+      if (e.key === "Enter") { e.preventDefault(); checkAnswer(); }
+    });
+
+    document.getElementById("btnAdd").onclick = () => {
+      const word = document.getElementById("newWord").value.trim();
+      const def = document.getElementById("newDef").value.trim();
+      if (!word || !def) { showToast("Nhập cả từ và định nghĩa."); return; }
+      words.push({ Id: crypto.randomUUID(), Word: word, Definition: def, ReviewCount: 0, CorrectCount: 0 });
+      store.saveWords(words);
+      document.getElementById("newWord").value = "";
+      document.getElementById("newDef").value = "";
+      renderManager();
+      if (!current) displayRandomWord();
+    };
+    document.getElementById("btnDelete").onclick = () => {
+      if (!selectedId) return;
+      words = words.filter(w => w.Id !== selectedId);
+      store.saveWords(words);
+      selectedId = null;
+      renderManager();
+      if (!words.find(w => w.Id === lastId)) displayRandomWord();
+    };
+    document.getElementById("btnImport").onclick = () => document.getElementById("fileImport").click();
+    document.getElementById("fileImport").onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const imported = parseImport(text, file.name);
+      const have = new Set(words.map(w => w.Word.trim().toLowerCase()));
+      let added = 0;
+      for (const item of imported) {
+        const key = item.Word.trim().toLowerCase();
+        if (!have.has(key)) { have.add(key); words.push(item); added++; }
+      }
+      store.saveWords(words);
+      renderManager();
+      showToast("Đã thêm " + added + " từ (bỏ qua trùng).");
+      e.target.value = "";
+    };
+    document.getElementById("btnClose").onclick = () => overlay.classList.remove("open");
+
+    placeDefault();
+    displayRandomWord();
+    restartTimer();
+    window.addEventListener("resize", () => {
+      const r = widget.getBoundingClientRect();
+      if (r.right > innerWidth || r.bottom > innerHeight) placeDefault();
+    });
+  </script>
+</body>
+</html>

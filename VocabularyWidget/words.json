@@ -1,0 +1,37 @@
+[
+  {
+    "Id": "1",
+    "Word": "resilient",
+    "Definition": "kiên cường, có khả năng phục hồi nhanh",
+    "ReviewCount": 0,
+    "CorrectCount": 0
+  },
+  {
+    "Id": "2",
+    "Word": "ubiquitous",
+    "Definition": "có mặt ở khắp mọi nơi, phổ biến",
+    "ReviewCount": 0,
+    "CorrectCount": 0
+  },
+  {
+    "Id": "3",
+    "Word": "diligent",
+    "Definition": "chăm chỉ, siêng năng",
+    "ReviewCount": 0,
+    "CorrectCount": 0
+  },
+  {
+    "Id": "4",
+    "Word": "innovative",
+    "Definition": "đổi mới, sáng tạo",
+    "ReviewCount": 0,
+    "CorrectCount": 0
+  },
+  {
+    "Id": "5",
+    "Word": "perspective",
+    "Definition": "góc nhìn, quan điểm",
+    "ReviewCount": 0,
+    "CorrectCount": 0
+  }
+]
