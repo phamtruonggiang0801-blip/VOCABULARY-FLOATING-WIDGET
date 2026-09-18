@@ -34,8 +34,12 @@ public class WidgetForm : Form
     private readonly Label _lblPrompt;
     private readonly Label[] _choiceLabels = new Label[4];
     private readonly Label _lblStatus;
+    private readonly SpeechService _speech = new();
+    private readonly Button _btnSpeak;
     private readonly NotifyIcon _tray;
     private readonly ContextMenuStrip _contextMenu;
+    private ToolStripMenuItem _autoSpeakItem = null!;
+    private ToolStripMenuItem _feedbackSoundItem = null!;
     private ManageForm? _manageForm;
 
     public WidgetForm()
@@ -127,6 +131,24 @@ public class WidgetForm : Form
         _lblStatus.MouseMove += OnPointerMove;
         _lblStatus.MouseUp += OnPointerUp;
 
+        _btnSpeak = new Button
+        {
+            Text = "听",
+            Size = new Size(28, 22),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(48, 50, 54),
+            Font = UiFont(9, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            TabStop = false,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        _btnSpeak.FlatAppearance.BorderSize = 0;
+        _btnSpeak.Location = new Point(Width - _btnSpeak.Width - 8, 6);
+        _btnSpeak.Click += (_, _) => SpeakCurrent(fromUser: true);
+        var speakTip = new ToolTip();
+        speakTip.SetToolTip(_btnSpeak, "Nghe phát âm chữ Hán (phím S)");
+
         MouseDown += OnPointerDown;
         MouseMove += OnPointerMove;
         MouseUp += OnPointerUp;
@@ -146,6 +168,8 @@ public class WidgetForm : Form
         Controls.Add(_quizPanel);
         Controls.Add(_lblContent);
         Controls.Add(_lblStatus);
+        Controls.Add(_btnSpeak);
+        _btnSpeak.BringToFront();
 
         _tray = new NotifyIcon
         {
@@ -170,6 +194,7 @@ public class WidgetForm : Form
         {
             _tray.Visible = false;
             _tray.Dispose();
+            _speech.Dispose();
         };
 
         DisplayRandomWord();
@@ -219,6 +244,30 @@ public class WidgetForm : Form
 
         menu.Items.Add(interval);
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Nghe phát âm", null, (_, _) => SpeakCurrent(fromUser: true));
+        _autoSpeakItem = new ToolStripMenuItem("Tự phát âm khi hiện thẻ")
+        {
+            Checked = _settings.AutoSpeakHanzi,
+            CheckOnClick = true
+        };
+        _autoSpeakItem.Click += (_, _) =>
+        {
+            _settings.AutoSpeakHanzi = _autoSpeakItem.Checked;
+            _dataService.SaveSettings(_settings);
+        };
+        _feedbackSoundItem = new ToolStripMenuItem("Âm thanh đúng/sai")
+        {
+            Checked = _settings.FeedbackSounds,
+            CheckOnClick = true
+        };
+        _feedbackSoundItem.Click += (_, _) =>
+        {
+            _settings.FeedbackSounds = _feedbackSoundItem.Checked;
+            _dataService.SaveSettings(_settings);
+        };
+        menu.Items.Add(_autoSpeakItem);
+        menu.Items.Add(_feedbackSoundItem);
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Thoát ứng dụng", null, (_, _) => Application.Exit());
         menu.Opening += (_, _) => RefreshIntervalChecks();
         return menu;
@@ -226,7 +275,8 @@ public class WidgetForm : Form
 
     private void RefreshIntervalChecks()
     {
-        if (_contextMenu.Items[2] is not ToolStripMenuItem interval)
+        if (_contextMenu.Items.OfType<ToolStripMenuItem>().FirstOrDefault(i => i.Text == "Chỉnh thời gian")
+            is not ToolStripMenuItem interval)
         {
             return;
         }
@@ -238,6 +288,9 @@ public class WidgetForm : Form
                 item.Checked = minutes == _settings.TimerMinutes;
             }
         }
+
+        _autoSpeakItem.Checked = _settings.AutoSpeakHanzi;
+        _feedbackSoundItem.Checked = _settings.FeedbackSounds;
     }
 
     private void SetInterval(int minutes)
@@ -325,6 +378,13 @@ public class WidgetForm : Form
 
     private void OnWidgetKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.KeyCode == Keys.S)
+        {
+            e.SuppressKeyPress = true;
+            SpeakCurrent(fromUser: true);
+            return;
+        }
+
         if (!_inQuiz || _question == null)
         {
             return;
@@ -394,8 +454,12 @@ public class WidgetForm : Form
         _quizPanel.Visible = false;
         _lblContent.ForeColor = Color.White;
         _lblContent.Text = _isShowingWord ? _currentWord.Word : _currentWord.Definition;
-        _lblStatus.Text = _isShowingWord ? "Click → chọn định nghĩa" : "Click → chọn từ vựng";
+        _lblStatus.Text = _isShowingWord ? "听 nghe · click quiz" : "听 chữ Hán · click quiz";
         _lblStatus.ForeColor = Color.FromArgb(160, 160, 160);
+        if (_settings.AutoSpeakHanzi)
+        {
+            SpeakCurrent(fromUser: false);
+        }
     }
 
     private void StartQuizMode()
@@ -428,7 +492,7 @@ public class WidgetForm : Form
             }
         }
 
-        _lblStatus.Text = "Chọn đáp án · Esc hủy";
+        _lblStatus.Text = "Chọn đáp án · Esc hủy · S nghe";
         _lblStatus.ForeColor = Color.FromArgb(160, 160, 160);
     }
 
@@ -487,6 +551,10 @@ public class WidgetForm : Form
             _lblStatus.ForeColor = Color.FromArgb(144, 238, 144);
             _feedbackTimer.Interval = 1500;
             _feedbackTimer.Tag = true;
+            if (_settings.FeedbackSounds)
+            {
+                FeedbackSounds.PlayCorrect();
+            }
         }
         else
         {
@@ -497,6 +565,10 @@ public class WidgetForm : Form
             _lblStatus.ForeColor = Color.Salmon;
             _feedbackTimer.Interval = 2000;
             _feedbackTimer.Tag = false;
+            if (_settings.FeedbackSounds)
+            {
+                FeedbackSounds.PlayWrong();
+            }
         }
 
         Invalidate();
@@ -522,6 +594,21 @@ public class WidgetForm : Form
         }
 
         RestartRotationTimer();
+    }
+
+    private void SpeakCurrent(bool fromUser)
+    {
+        if (_currentWord == null)
+        {
+            return;
+        }
+
+        _speech.SpeakHanzi(_currentWord.Word);
+        if (fromUser && !_speech.HasChineseVoice)
+        {
+            _lblStatus.Text = "Cài giọng Trung trong Windows (Speech)";
+            _lblStatus.ForeColor = Color.Khaki;
+        }
     }
 
     private void ApplyIdleLayout()

@@ -33,7 +33,7 @@ public class DataServiceTests
     }
 
     [Fact]
-    public void Persists_timer_minutes()
+    public void Persists_timer_minutes_and_audio_flags()
     {
         string dir = Path.Combine(Path.GetTempPath(), "vw-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -42,9 +42,16 @@ public class DataServiceTests
             var service = new DataService(dir);
             var settings = service.LoadSettings();
             Assert.Equal(5, settings.TimerMinutes);
+            Assert.False(settings.AutoSpeakHanzi);
+            Assert.False(settings.FeedbackSounds);
             settings.SetTimerMinutes(3);
+            settings.AutoSpeakHanzi = true;
+            settings.FeedbackSounds = true;
             service.SaveSettings(settings);
-            Assert.Equal(3, new DataService(dir).LoadSettings().TimerMinutes);
+            var again = new DataService(dir).LoadSettings();
+            Assert.Equal(3, again.TimerMinutes);
+            Assert.True(again.AutoSpeakHanzi);
+            Assert.True(again.FeedbackSounds);
             settings.SetTimerMinutes(99);
             Assert.Equal(5, settings.TimerMinutes);
         }
