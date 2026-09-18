@@ -1,6 +1,6 @@
 # VOCABULARY FLOATING WIDGET
 
-Portable always-on-top Windows widget that rotates vocabulary and quizzes you on click. One self-contained `.exe`, no installer, no Administrator rights.
+Portable always-on-top Windows widget that rotates **HSK Chinese → Vietnamese** vocabulary and quizzes you with four multiple-choice answers. One self-contained `.exe`, no installer, no Administrator rights.
 
 ## Run (Windows)
 
@@ -17,12 +17,13 @@ Requires Windows 10/11 x64. The machine does **not** need a separate .NET runtim
 ## Behavior
 
 - 260×110, no title bar, always on top, hidden from the taskbar (system tray).
-- Appears at the bottom-right; drag to move. Left-click the text to quiz; drag does not start a quiz.
-- Every cycle (default 5 minutes) shows either the **word** or the **definition**.
-- Enter submits; Esc cancels. Correct → green border, “Chính xác!”, next card after 1.5s. Wrong → red border, reveal answer, same card stays.
+- Appears at the bottom-right; drag to move. Left-click the text to start a **4-answer quiz**; drag does not start a quiz.
+- Every cycle (default 5 minutes) shows either the **Chinese word** or the **Vietnamese definition**.
+- Click a choice (or press 1–4). Esc cancels. Correct → green border, “Chính xác!”, next card after 1.5s. Wrong → red border, reveal answer, same card stays.
 - Right-click: manage words, skip to next card, set interval (1 / 3 / 5 / 10 minutes), exit.
-- Manage window: add / edit / delete, import `.csv` (`word,definition`) or `.txt` (`word | definition`).
+- Manage window: add / edit / delete, import `.csv` (`word,definition`) or `.txt` / tab-separated HSK lists.
 - Cards you miss are shown more often.
+- Shipped lexicon: ~496 HSK cards (Chinese → Vietnamese) in `words.json`.
 
 ## Browser preview
 
@@ -44,13 +45,13 @@ WinForms UI lives in `VocabularyWidget/`; domain logic (JSON, matching, import, 
 
 ## Data
 
-`words.json` is a JSON array of:
+`words.json` is a JSON array of HSK cards:
 
 ```json
 {
   "Id": "1",
-  "Word": "resilient",
-  "Definition": "kiên cường, có khả năng phục hồi nhanh",
+  "Word": "爱",
+  "Definition": "Yêu; thương; yêu quý",
   "ReviewCount": 0,
   "CorrectCount": 0
 }

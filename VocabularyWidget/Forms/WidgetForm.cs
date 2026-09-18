@@ -6,14 +6,20 @@ namespace VocabularyWidget.Forms;
 
 public class WidgetForm : Form
 {
+    private static readonly Size IdleSize = new(260, 110);
+    private static readonly Size QuizSize = new(300, 252);
+    private static readonly Color IdleBorder = Color.FromArgb(70, 72, 76);
+
     private readonly DataService _dataService;
     private readonly ReviewScheduler _scheduler = new();
+    private readonly Random _random = new();
     private readonly System.Windows.Forms.Timer _timer;
     private readonly System.Windows.Forms.Timer _feedbackTimer;
 
     private List<WordItem> _wordList;
     private AppSettings _settings;
     private WordItem? _currentWord;
+    private MultipleChoiceQuestion? _question;
     private bool _isShowingWord;
     private bool _inQuiz;
     private bool _inFeedback;
@@ -21,10 +27,12 @@ public class WidgetForm : Form
     private bool _dragMoved;
     private Point _dragCursor;
     private Point _dragForm;
-    private Color _borderColor = Color.FromArgb(70, 72, 76);
+    private Color _borderColor = IdleBorder;
 
     private readonly Label _lblContent;
-    private readonly TextBox _txtAnswer;
+    private readonly Panel _quizPanel;
+    private readonly Label _lblPrompt;
+    private readonly Label[] _choiceLabels = new Label[4];
     private readonly Label _lblStatus;
     private readonly NotifyIcon _tray;
     private readonly ContextMenuStrip _contextMenu;
@@ -41,10 +49,12 @@ public class WidgetForm : Form
         ShowInTaskbar = false;
         BackColor = Color.FromArgb(32, 33, 36);
         StartPosition = FormStartPosition.Manual;
-        Size = new Size(260, 110);
+        Size = IdleSize;
         DoubleBuffered = true;
+        KeyPreview = true;
         Text = "Vocabulary Widget";
         Padding = new Padding(2);
+        Font = UiFont(9);
 
         Rectangle workingArea = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1280, 720);
         Location = new Point(workingArea.Right - Width - 20, workingArea.Bottom - Height - 40);
@@ -52,7 +62,7 @@ public class WidgetForm : Form
         _lblContent = new Label
         {
             ForeColor = Color.White,
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            Font = UiFont(12, FontStyle.Bold),
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleCenter,
             Cursor = Cursors.Hand,
@@ -62,24 +72,55 @@ public class WidgetForm : Form
         _lblContent.MouseMove += OnPointerMove;
         _lblContent.MouseUp += OnPointerUp;
 
-        _txtAnswer = new TextBox
+        _lblPrompt = new Label
         {
-            Visible = false,
-            Font = new Font("Segoe UI", 11),
-            BorderStyle = BorderStyle.FixedSingle,
-            Width = 220,
-            Location = new Point(20, 36)
+            Dock = DockStyle.Top,
+            Height = 36,
+            ForeColor = Color.White,
+            Font = UiFont(11, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter
         };
-        _txtAnswer.KeyDown += TxtAnswer_KeyDown;
+
+        _quizPanel = new Panel { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(8, 0, 8, 4) };
+        var choices = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(0)
+        };
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        for (int i = 0; i < 4; i++)
+        {
+            choices.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+            int index = i;
+            var choice = new Label
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 2, 0, 2),
+                Padding = new Padding(8, 2, 8, 2),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(48, 50, 54),
+                Font = UiFont(8.5f),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Cursor = Cursors.Hand
+            };
+            choice.Click += (_, _) => OnChoiceClicked(index);
+            _choiceLabels[i] = choice;
+            choices.Controls.Add(choice, 0, i);
+        }
+
+        _quizPanel.Controls.Add(choices);
+        _quizPanel.Controls.Add(_lblPrompt);
 
         _lblStatus = new Label
         {
             ForeColor = Color.FromArgb(160, 160, 160),
-            Font = new Font("Segoe UI", 8),
+            Font = UiFont(8),
             Dock = DockStyle.Bottom,
             TextAlign = ContentAlignment.MiddleCenter,
             Height = 22,
-            Text = "Click để kiểm tra",
+            Text = "Click để trắc nghiệm",
             Cursor = Cursors.SizeAll
         };
         _lblStatus.MouseDown += OnPointerDown;
@@ -89,6 +130,7 @@ public class WidgetForm : Form
         MouseDown += OnPointerDown;
         MouseMove += OnPointerMove;
         MouseUp += OnPointerUp;
+        KeyDown += OnWidgetKeyDown;
         Paint += (_, e) =>
         {
             using var pen = new Pen(_borderColor, 2);
@@ -101,7 +143,7 @@ public class WidgetForm : Form
         _lblContent.ContextMenuStrip = _contextMenu;
         _lblStatus.ContextMenuStrip = _contextMenu;
 
-        Controls.Add(_txtAnswer);
+        Controls.Add(_quizPanel);
         Controls.Add(_lblContent);
         Controls.Add(_lblStatus);
 
@@ -132,6 +174,23 @@ public class WidgetForm : Form
 
         DisplayRandomWord();
         _timer.Start();
+    }
+
+    private static Font UiFont(float size, FontStyle style = FontStyle.Regular)
+    {
+        foreach (string name in new[] { "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI" })
+        {
+            try
+            {
+                return new Font(name, size, style, GraphicsUnit.Point);
+            }
+            catch
+            {
+                // try next family
+            }
+        }
+
+        return new Font(FontFamily.GenericSansSerif, size, style, GraphicsUnit.Point);
     }
 
     private ContextMenuStrip BuildContextMenu()
@@ -264,18 +323,55 @@ public class WidgetForm : Form
         }
     }
 
+    private void OnWidgetKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!_inQuiz || _question == null)
+        {
+            return;
+        }
+
+        if (e.KeyCode == Keys.Escape)
+        {
+            e.SuppressKeyPress = true;
+            CancelQuizUi();
+            ShowPrompt();
+            RestartRotationTimer();
+            return;
+        }
+
+        int index = e.KeyCode switch
+        {
+            Keys.D1 or Keys.NumPad1 => 0,
+            Keys.D2 or Keys.NumPad2 => 1,
+            Keys.D3 or Keys.NumPad3 => 2,
+            Keys.D4 or Keys.NumPad4 => 3,
+            Keys.A => 0,
+            Keys.B => 1,
+            Keys.C => 2,
+            Keys.D => 3,
+            _ => -1
+        };
+        if (index >= 0)
+        {
+            e.SuppressKeyPress = true;
+            OnChoiceClicked(index);
+        }
+    }
+
     private void DisplayRandomWord()
     {
         _inQuiz = false;
         _inFeedback = false;
-        _borderColor = Color.FromArgb(70, 72, 76);
+        _question = null;
+        ApplyIdleLayout();
+        _borderColor = IdleBorder;
         Invalidate();
 
         _currentWord = _scheduler.PickNext(_wordList, _currentWord);
         if (_currentWord == null)
         {
             _lblContent.Visible = true;
-            _txtAnswer.Visible = false;
+            _quizPanel.Visible = false;
             _lblContent.Text = "Chưa có từ vựng!";
             _lblStatus.Text = "Chuột phải → Quản lý từ vựng";
             _lblStatus.ForeColor = Color.FromArgb(160, 160, 160);
@@ -293,11 +389,12 @@ public class WidgetForm : Form
             return;
         }
 
+        ApplyIdleLayout();
         _lblContent.Visible = true;
-        _txtAnswer.Visible = false;
+        _quizPanel.Visible = false;
         _lblContent.ForeColor = Color.White;
         _lblContent.Text = _isShowingWord ? _currentWord.Word : _currentWord.Definition;
-        _lblStatus.Text = _isShowingWord ? "Nhập định nghĩa..." : "Nhập từ vựng...";
+        _lblStatus.Text = _isShowingWord ? "Click → chọn nghĩa" : "Click → chọn từ Hán";
         _lblStatus.ForeColor = Color.FromArgb(160, 160, 160);
     }
 
@@ -308,54 +405,64 @@ public class WidgetForm : Form
             return;
         }
 
+        _question = MultipleChoiceBuilder.Build(_wordList, _currentWord, _isShowingWord, _random);
         _inQuiz = true;
         _timer.Stop();
+        ApplyQuizLayout();
         _lblContent.Visible = false;
-        _txtAnswer.Visible = true;
-        _txtAnswer.Clear();
-        _txtAnswer.ForeColor = Color.Black;
-        _txtAnswer.BackColor = Color.White;
-        _txtAnswer.Focus();
-        _lblStatus.Text = _isShowingWord ? "Enter = gửi · Esc = hủy" : "Enter = gửi · Esc = hủy";
+        _quizPanel.Visible = true;
+        _lblPrompt.Text = _question.Prompt;
+        for (int i = 0; i < _choiceLabels.Length; i++)
+        {
+            if (i < _question.Options.Count)
+            {
+                _choiceLabels[i].Visible = true;
+                _choiceLabels[i].Enabled = true;
+                _choiceLabels[i].BackColor = Color.FromArgb(48, 50, 54);
+                _choiceLabels[i].ForeColor = Color.White;
+                _choiceLabels[i].Text = $"{i + 1}. {_question.Options[i]}";
+            }
+            else
+            {
+                _choiceLabels[i].Visible = false;
+            }
+        }
+
+        _lblStatus.Text = "Chọn đáp án · Esc hủy";
+        _lblStatus.ForeColor = Color.FromArgb(160, 160, 160);
     }
 
-    private void TxtAnswer_KeyDown(object? sender, KeyEventArgs e)
+    private void OnChoiceClicked(int index)
     {
-        if (e.KeyCode == Keys.Escape)
+        if (!_inQuiz || _question == null || index < 0 || index >= _question.Options.Count)
         {
-            e.SuppressKeyPress = true;
-            CancelQuizUi();
-            ShowPrompt();
-            RestartRotationTimer();
+            return;
         }
-        else if (e.KeyCode == Keys.Enter)
-        {
-            e.SuppressKeyPress = true;
-            CheckAnswer();
-        }
+
+        string choice = _question.Options[index];
+        bool isCorrect = _question.IsCorrect(choice);
+        Grade(isCorrect, choice);
     }
 
     private void CancelQuizUi()
     {
         _inQuiz = false;
         _inFeedback = false;
+        _question = null;
         _feedbackTimer.Stop();
-        _txtAnswer.Visible = false;
+        ApplyIdleLayout();
+        _quizPanel.Visible = false;
         _lblContent.Visible = true;
-        _borderColor = Color.FromArgb(70, 72, 76);
+        _borderColor = IdleBorder;
         Invalidate();
     }
 
-    private void CheckAnswer()
+    private void Grade(bool isCorrect, string chosen)
     {
-        if (_currentWord == null)
+        if (_currentWord == null || _question == null)
         {
             return;
         }
-
-        string target = _isShowingWord ? _currentWord.Definition : _currentWord.Word;
-        string input = _txtAnswer.Text;
-        bool isCorrect = AnswerChecker.IsCorrect(input, target);
 
         _currentWord.ReviewCount++;
         if (isCorrect)
@@ -367,7 +474,8 @@ public class WidgetForm : Form
 
         _inQuiz = false;
         _inFeedback = true;
-        _txtAnswer.Visible = false;
+        ApplyIdleLayout();
+        _quizPanel.Visible = false;
         _lblContent.Visible = true;
 
         if (isCorrect)
@@ -375,7 +483,7 @@ public class WidgetForm : Form
             _borderColor = Color.FromArgb(46, 204, 113);
             _lblContent.ForeColor = Color.FromArgb(46, 204, 113);
             _lblContent.Text = "Chính xác!";
-            _lblStatus.Text = target;
+            _lblStatus.Text = _question.CorrectAnswer;
             _lblStatus.ForeColor = Color.FromArgb(144, 238, 144);
             _feedbackTimer.Interval = 1500;
             _feedbackTimer.Tag = true;
@@ -384,10 +492,8 @@ public class WidgetForm : Form
         {
             _borderColor = Color.FromArgb(231, 76, 60);
             _lblContent.ForeColor = Color.FromArgb(255, 160, 150);
-            _lblContent.Text = $"Sai rồi! Đáp án: {target}";
-            _lblStatus.Text = string.IsNullOrWhiteSpace(input)
-                ? "Bạn chưa nhập gì"
-                : $"Bạn đã nhập: {input.Trim()}";
+            _lblContent.Text = $"Sai rồi! Đáp án: {_question.CorrectAnswer}";
+            _lblStatus.Text = $"Bạn chọn: {chosen}";
             _lblStatus.ForeColor = Color.Salmon;
             _feedbackTimer.Interval = 2000;
             _feedbackTimer.Tag = false;
@@ -403,7 +509,7 @@ public class WidgetForm : Form
         _feedbackTimer.Stop();
         _inFeedback = false;
         bool wasCorrect = _feedbackTimer.Tag is true;
-        _borderColor = Color.FromArgb(70, 72, 76);
+        _borderColor = IdleBorder;
         Invalidate();
 
         if (wasCorrect)
@@ -416,6 +522,24 @@ public class WidgetForm : Form
         }
 
         RestartRotationTimer();
+    }
+
+    private void ApplyIdleLayout()
+    {
+        AnchorBottomRight(IdleSize);
+    }
+
+    private void ApplyQuizLayout()
+    {
+        AnchorBottomRight(QuizSize);
+    }
+
+    private void AnchorBottomRight(Size next)
+    {
+        int right = Location.X + Width;
+        int bottom = Location.Y + Height;
+        Size = next;
+        Location = new Point(right - Width, bottom - Height);
     }
 
     private void RestartRotationTimer()
