@@ -49,6 +49,54 @@
     #widget.ok { border-color: var(--ok); }
     #widget.bad { border-color: var(--bad); }
     #widget.quiz { width: 300px; height: 252px; }
+    #widget.write { width: 320px; height: 176px; }
+    #widget.work {
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw;
+      height: 64px;
+      border-radius: 0;
+      flex-direction: row;
+      align-items: stretch;
+    }
+    #widget.work #content,
+    #widget.work #quiz,
+    #widget.work #status,
+    #widget.work #writeBox { display: none !important; }
+    #widget.work #work {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      align-items: center;
+      padding: 0 44px 0 16px;
+    }
+    #widget.work #speak {
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    #work {
+      display: none;
+      overflow: hidden;
+      min-width: 0;
+    }
+    #marquee {
+      font-size: 26pt;
+      font-weight: 700;
+      white-space: nowrap;
+      will-change: transform;
+    }
+    #writeBox {
+      display: none;
+      margin: 0 12px 8px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid #555;
+      border-radius: 4px;
+      background: #303236;
+      color: #fff;
+    }
+    #widget.write #writeBox { display: block; }
     #content {
       flex: 1;
       display: flex;
@@ -196,7 +244,7 @@
 <body>
   <div class="wallpaper-hint">
     <h1>Vocabulary Floating Widget</h1>
-    <p>HSK tiếng Trung → tiếng Việt. Nút <strong>听</strong> để nghe chữ Hán · click thẻ để trắc nghiệm 4 đáp án · chuột phải để mở menu.</p>
+    <p>HSK tiếng Trung → tiếng Việt. Nút <strong>听</strong> / phím S để nghe chữ Hán. Click thẻ để trắc nghiệm 4 đáp án. Chuột phải → <strong>Chế độ</strong>: Nghe, Làm việc, Viết.</p>
   </div>
   <div id="widget" role="application" aria-label="Vocabulary widget">
     <div id="content">Đang tải…</div>
@@ -204,6 +252,8 @@
       <div id="prompt"></div>
       <div id="choices"></div>
     </div>
+    <div id="work"><div id="marquee"></div></div>
+    <input id="writeBox" type="text" autocomplete="off" spellcheck="false" placeholder="Gõ một từ rồi Enter" />
     <button id="speak" type="button" title="Nghe phát âm chữ Hán (phím S)">听</button>
     <div id="status">Click để trắc nghiệm</div>
   </div>
@@ -264,10 +314,19 @@
       saveFlag(key, value) { localStorage.setItem(key, value ? "1" : "0"); }
     };
 
+    const MODES = ["quiz", "listen", "work", "write"];
+    const LISTEN_MS = 10000;
+    const WORK_MS = 20000;
+    const writeBox = document.getElementById("writeBox");
+    const workEl = document.getElementById("work");
+    const marquee = document.getElementById("marquee");
+
     let words = [];
     let minutes = store.loadMinutes();
     let autoSpeak = store.loadFlag("vw.autoSpeak");
     let feedbackSounds = store.loadFlag("vw.feedbackSounds");
+    let mode = (localStorage.getItem("vw.mode") || "quiz").toLowerCase();
+    if (!MODES.includes(mode)) mode = "quiz";
     let current = null;
     let showingWord = true;
     let inQuiz = false;
@@ -277,6 +336,9 @@
     let feedbackId = null;
     let selectedId = null;
     let lastId = null;
+    let marqueeRaf = 0;
+    let marqueeX = 0;
+    let savedIdle = null;
 
     function missCount(w) { return Math.max(0, (w.ReviewCount || 0) - (w.CorrectCount || 0)); }
 
@@ -321,37 +383,114 @@
       }
     }
 
-    function idleSize() {
+    function rememberIdle() {
+      if (!widget.classList.contains("work")) {
+        savedIdle = { left: widget.offsetLeft, top: widget.offsetTop };
+      }
+    }
+
+    function stopMarquee() {
+      if (marqueeRaf) cancelAnimationFrame(marqueeRaf);
+      marqueeRaf = 0;
+    }
+
+    function startMarquee() {
+      stopMarquee();
+      marqueeX = -Math.max(marquee.offsetWidth, 1);
+      marquee.style.transform = "translateX(" + marqueeX + "px)";
+      const step = () => {
+        if (mode !== "work") return;
+        marqueeX += 1.6;
+        if (marqueeX > workEl.clientWidth) marqueeX = -Math.max(marquee.offsetWidth, 1);
+        marquee.style.transform = "translateX(" + marqueeX + "px)";
+        marqueeRaf = requestAnimationFrame(step);
+      };
+      marqueeRaf = requestAnimationFrame(step);
+    }
+
+    function applyChrome(kind) {
+      const wasWork = widget.classList.contains("work");
+      if (kind === "work") {
+        if (!wasWork) rememberIdle();
+        widget.classList.remove("quiz", "write");
+        widget.classList.add("work");
+        widget.style.left = "0px";
+        widget.style.top = "0px";
+        return;
+      }
+      widget.classList.remove("quiz", "write", "work");
+      if (kind === "quiz") widget.classList.add("quiz");
+      if (kind === "write") widget.classList.add("write");
+      if (wasWork && savedIdle) {
+        widget.style.left = savedIdle.left + "px";
+        widget.style.top = savedIdle.top + "px";
+        return;
+      }
       const right = widget.offsetLeft + widget.offsetWidth;
       const bottom = widget.offsetTop + widget.offsetHeight;
-      widget.classList.remove("quiz");
       widget.style.left = (right - widget.offsetWidth) + "px";
       widget.style.top = (bottom - widget.offsetHeight) + "px";
     }
 
-    function quizSize() {
-      const right = widget.offsetLeft + widget.offsetWidth;
-      const bottom = widget.offsetTop + widget.offsetHeight;
-      widget.classList.add("quiz");
-      widget.style.left = (right - widget.offsetWidth) + "px";
-      widget.style.top = (bottom - widget.offsetHeight) + "px";
+    function maybeAutoSpeak() {
+      if (autoSpeak) speakHanzi();
     }
 
     function showPrompt() {
       inQuiz = false;
       question = null;
-      idleSize();
       quizEl.style.display = "none";
-      content.style.display = "flex";
+      status.style.color = "var(--muted)";
       if (!current) {
+        applyChrome(mode === "work" ? "work" : (mode === "write" ? "write" : "idle"));
+        stopMarquee();
+        workEl.style.display = mode === "work" ? "flex" : "none";
+        content.style.display = mode === "work" ? "none" : "flex";
         content.textContent = "Chưa có từ vựng!";
         status.textContent = "Chuột phải → Quản lý từ vựng";
+        if (mode === "work") {
+          marquee.textContent = "Chưa có từ vựng — chuột phải → Quản lý từ vựng";
+          startMarquee();
+        }
         return;
       }
+      if (mode === "listen") {
+        applyChrome("idle");
+        workEl.style.display = "none";
+        content.style.display = "flex";
+        content.textContent = current.Word;
+        status.textContent = current.Definition + "  ·  tự chạy 10s";
+        speakHanzi();
+        return;
+      }
+      if (mode === "work") {
+        applyChrome("work");
+        content.style.display = "none";
+        workEl.style.display = "flex";
+        marquee.textContent = current.Word + "    " + current.Definition;
+        startMarquee();
+        maybeAutoSpeak();
+        return;
+      }
+      if (mode === "write") {
+        applyChrome("write");
+        workEl.style.display = "none";
+        content.style.display = "flex";
+        content.textContent = showingWord ? current.Word : current.Definition;
+        status.textContent = showingWord ? "Gõ một từ nghĩa Việt · Enter" : "Gõ một chữ Hán · Enter";
+        writeBox.value = "";
+        writeBox.disabled = false;
+        writeBox.style.display = "";
+        setTimeout(() => writeBox.focus(), 0);
+        maybeAutoSpeak();
+        return;
+      }
+      applyChrome("idle");
+      workEl.style.display = "none";
+      content.style.display = "flex";
       content.textContent = showingWord ? current.Word : current.Definition;
       status.textContent = showingWord ? "听 nghe · click quiz" : "听 chữ Hán · click quiz";
-      status.style.color = "var(--muted)";
-      if (autoSpeak) speakHanzi();
+      maybeAutoSpeak();
     }
 
     function displayRandomWord() {
@@ -363,19 +502,42 @@
       showPrompt();
     }
 
+    function rotationMs() {
+      if (mode === "listen") return LISTEN_MS;
+      if (mode === "work") return WORK_MS;
+      return minutes * 60 * 1000;
+    }
+
     function restartTimer() {
       clearInterval(timerId);
-      timerId = setInterval(displayRandomWord, minutes * 60 * 1000);
+      timerId = null;
+      if (mode === "write" && !inFeedback) return;
+      timerId = setInterval(displayRandomWord, rotationMs());
+    }
+
+    function setMode(next) {
+      if (!MODES.includes(next) || next === mode) return;
+      clearTimeout(feedbackId);
+      inQuiz = false;
+      inFeedback = false;
+      stopMarquee();
+      mode = next;
+      localStorage.setItem("vw.mode", mode);
+      displayRandomWord();
+      restartTimer();
+      const labels = { quiz: "Trắc nghiệm", listen: "Nghe", work: "Làm việc", write: "Viết" };
+      showToast("Chế độ: " + labels[mode]);
     }
 
     function startQuiz() {
-      if (!current || inQuiz || inFeedback) return;
+      if (mode !== "quiz" || !current || inQuiz || inFeedback) return;
       question = buildQuestion(current, showingWord);
       inQuiz = true;
       clearInterval(timerId);
       content.style.display = "none";
+      workEl.style.display = "none";
       quizEl.style.display = "flex";
-      quizSize();
+      applyChrome("quiz");
       promptEl.textContent = question.prompt;
       choicesEl.innerHTML = question.options.map((opt, i) =>
         `<button type="button" data-i="${i}">${i + 1}. ${escapeHtml(opt)}</button>`
@@ -391,6 +553,80 @@
       restartTimer();
     }
 
+    function writeExpected() {
+      if (!current) return "";
+      return showingWord ? current.Definition : current.Word;
+    }
+
+    function normalizeAnswer(s) {
+      return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+    }
+
+    function tokenizeAnswer(s) {
+      return normalizeAnswer(s).split(/[\s,;:|/·•\-—–]+/)
+        .map(t => t.replace(/^[.!?“”"'（）()]+|[.!?“”"'（）()]+$/g, ""))
+        .filter(Boolean);
+    }
+
+    function isMeaningfulToken(t) {
+      if (/[\u4e00-\u9fff]/.test(t)) return true;
+      return t.length >= 2;
+    }
+
+    function matchesAnyToken(input, expected) {
+      if (normalizeAnswer(input) === normalizeAnswer(expected) && normalizeAnswer(input) !== "") return true;
+      const exp = tokenizeAnswer(expected);
+      if (!exp.length) return false;
+      return tokenizeAnswer(input).some(t => isMeaningfulToken(t) && exp.includes(t));
+    }
+
+    function submitWrite() {
+      if (mode !== "write" || inFeedback || !current) return;
+      const typed = writeBox.value;
+      const expected = writeExpected();
+      gradeWrite(matchesAnyToken(typed, expected), typed.trim() || "(trống)", expected);
+    }
+
+    function gradeWrite(ok, chosen, correct) {
+      current.ReviewCount = (current.ReviewCount || 0) + 1;
+      if (ok) current.CorrectCount = (current.CorrectCount || 0) + 1;
+      store.saveWords(words);
+      inQuiz = false;
+      inFeedback = true;
+      applyChrome("write");
+      quizEl.style.display = "none";
+      workEl.style.display = "none";
+      content.style.display = "flex";
+      writeBox.value = "";
+      writeBox.disabled = true;
+      writeBox.style.display = "none";
+      if (ok) {
+        setBorder("ok");
+        content.textContent = "Chính xác!";
+        status.textContent = correct;
+        status.style.color = "#90ee90";
+        playBeep(true);
+        feedbackId = setTimeout(() => {
+          inFeedback = false;
+          setBorder(null);
+          displayRandomWord();
+          restartTimer();
+        }, 1500);
+      } else {
+        setBorder("bad");
+        content.textContent = "Sai rồi! Đáp án: " + correct;
+        status.textContent = "Bạn chọn: " + chosen;
+        status.style.color = "salmon";
+        playBeep(false);
+        feedbackId = setTimeout(() => {
+          inFeedback = false;
+          setBorder(null);
+          showPrompt();
+          restartTimer();
+        }, 2000);
+      }
+    }
+
     function grade(choice) {
       if (!current || !question) return;
       const ok = choice === question.correct;
@@ -399,8 +635,9 @@
       store.saveWords(words);
       inQuiz = false;
       inFeedback = true;
-      idleSize();
+      applyChrome("idle");
       quizEl.style.display = "none";
+      workEl.style.display = "none";
       content.style.display = "flex";
       if (ok) {
         setBorder("ok");
@@ -549,6 +786,11 @@
       menu.innerHTML = `
         <button type="button" data-act="manage">Quản lý từ vựng</button>
         <button type="button" data-act="next">Đổi từ khác ngay lập tức</button>
+        <div class="item">Chế độ</div>
+        <button type="button" class="sub ${mode === "quiz" ? "checked" : ""}" data-act="mode" data-mode="quiz">Trắc nghiệm (4 đáp án)</button>
+        <button type="button" class="sub ${mode === "listen" ? "checked" : ""}" data-act="mode" data-mode="listen">Nghe (tự phát âm)</button>
+        <button type="button" class="sub ${mode === "work" ? "checked" : ""}" data-act="mode" data-mode="work">Làm việc (thanh trên màn hình)</button>
+        <button type="button" class="sub ${mode === "write" ? "checked" : ""}" data-act="mode" data-mode="write">Viết (gõ một từ)</button>
         <div class="item">Chỉnh thời gian</div>
         ${ALLOWED.map(m => `<button type="button" class="sub ${m === minutes ? "checked" : ""}" data-act="interval" data-min="${m}">${m} phút</button>`).join("")}
         <div class="sep"></div>
@@ -559,7 +801,7 @@
         <button type="button" data-act="exit">Thoát ứng dụng</button>`;
       menu.style.display = "block";
       menu.style.left = Math.min(x, innerWidth - 240) + "px";
-      menu.style.top = Math.min(y, innerHeight - 260) + "px";
+      menu.style.top = Math.min(y, innerHeight - 360) + "px";
     }
 
     menu.addEventListener("click", (e) => {
@@ -575,6 +817,7 @@
         restartTimer();
         showToast("Chu kỳ: " + minutes + " phút");
       }
+      if (act === "mode") setMode(btn.dataset.mode);
       if (act === "speak") speakHanzi();
       if (act === "autoSpeak") {
         autoSpeak = !autoSpeak;
@@ -605,10 +848,11 @@
     function placeDefault() {
       widget.style.left = (innerWidth - 260 - 20) + "px";
       widget.style.top = (innerHeight - 110 - 40) + "px";
+      savedIdle = { left: innerWidth - 260 - 20, top: innerHeight - 110 - 40 };
     }
     function onDown(e) {
-      if (e.target.closest("#speak") || e.target.closest("#choices")) return;
-      if (e.button !== 0 || inQuiz) return;
+      if (e.target.closest("#speak") || e.target.closest("#choices") || e.target.closest("#writeBox")) return;
+      if (e.button !== 0 || inQuiz || mode === "work") return;
       dragging = true; moved = false;
       startX = e.clientX; startY = e.clientY;
       origL = widget.offsetLeft; origT = widget.offsetTop;
@@ -620,6 +864,7 @@
       if (moved) {
         widget.style.left = (origL + dx) + "px";
         widget.style.top = (origT + dy) + "px";
+        savedIdle = { left: origL + dx, top: origT + dy };
       }
     }
     function onUp(e) {
@@ -638,6 +883,10 @@
     });
 
     document.addEventListener("keydown", (e) => {
+      if (mode === "write" && !inFeedback) {
+        if (e.key === "Enter") { e.preventDefault(); submitWrite(); return; }
+        if (e.key === "Escape") { e.preventDefault(); writeBox.value = ""; writeBox.focus(); return; }
+      }
       if (e.key === "s" || e.key === "S") {
         if (e.target && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
         e.preventDefault();
@@ -651,6 +900,12 @@
       if (idx === undefined || idx >= question.options.length) return;
       e.preventDefault();
       grade(question.options[idx]);
+    });
+
+    writeBox.addEventListener("mousedown", (e) => e.stopPropagation());
+    writeBox.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); submitWrite(); }
+      if (e.key === "Escape") { e.preventDefault(); writeBox.value = ""; }
     });
 
     document.getElementById("btnAdd").onclick = () => {
@@ -709,6 +964,10 @@
     }
     boot();
     window.addEventListener("resize", () => {
+      if (mode === "work") {
+        applyChrome("work");
+        return;
+      }
       const r = widget.getBoundingClientRect();
       if (r.right > innerWidth || r.bottom > innerHeight) placeDefault();
     });

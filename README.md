@@ -22,7 +22,8 @@ Requires Windows 10/11 x64. The machine does **not** need a separate .NET runtim
 - Appears at the bottom-right; drag to move. Left-click the text to start a **4-answer quiz**; drag does not start a quiz.
 - Every cycle (default 5 minutes) shows either the **Chinese word** or the **Vietnamese definition**.
 - Click a choice (or press 1–4). **听** / **S** plays the Chinese word (Windows TTS, offline). Esc cancels. Correct → green border, “Chính xác!”, next card after 1.5s. Wrong → red border, reveal answer, same card stays.
-- Right-click: manage words, skip to next card, set interval (1 / 3 / 5 / 10 minutes), exit.
+- Right-click **Chế độ** switches: **Nghe** (auto-speak ~10s), **Làm việc** (top-of-screen LTR ribbon, ~26pt), **Viết** (type one matching word). Quiz mode stays the default click-to-4-choice widget.
+- Right-click also: manage words, skip to next card, set interval (1 / 3 / 5 / 10 minutes), exit.
 - Manage window: add / edit / delete, import `.csv` (`word,definition`) or `.txt` / tab-separated HSK lists.
 - Cards you miss are shown more often.
 - Shipped lexicon: ~496 HSK cards (Chinese → Vietnamese) in `words.json`.
