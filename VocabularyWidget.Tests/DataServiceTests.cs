@@ -1,0 +1,56 @@
+using VocabularyWidget.Services;
+using Xunit;
+
+namespace VocabularyWidget.Tests;
+
+public class DataServiceTests
+{
+    [Fact]
+    public void Seeds_and_round_trips_words()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vw-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var service = new DataService(dir);
+            var loaded = service.LoadWords();
+            Assert.True(loaded.Count >= 5);
+            Assert.Contains(loaded, w => w.Word == "resilient");
+
+            loaded[0].ReviewCount = 3;
+            loaded[0].CorrectCount = 1;
+            service.SaveWords(loaded);
+
+            var again = new DataService(dir).LoadWords();
+            var resilient = again.First(w => w.Word == "resilient");
+            Assert.Equal(3, resilient.ReviewCount);
+            Assert.Equal(1, resilient.CorrectCount);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Persists_timer_minutes()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "vw-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var service = new DataService(dir);
+            var settings = service.LoadSettings();
+            Assert.Equal(5, settings.TimerMinutes);
+            settings.SetTimerMinutes(3);
+            service.SaveSettings(settings);
+            Assert.Equal(3, new DataService(dir).LoadSettings().TimerMinutes);
+            settings.SetTimerMinutes(99);
+            Assert.Equal(5, settings.TimerMinutes);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+}
