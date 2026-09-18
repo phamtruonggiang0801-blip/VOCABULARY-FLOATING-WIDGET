@@ -394,7 +394,7 @@ public class WidgetForm : Form
         _quizPanel.Visible = false;
         _lblContent.ForeColor = Color.White;
         _lblContent.Text = _isShowingWord ? _currentWord.Word : _currentWord.Definition;
-        _lblStatus.Text = _isShowingWord ? "Click → chọn nghĩa" : "Click → chọn từ Hán";
+        _lblStatus.Text = _isShowingWord ? "Click → chọn định nghĩa" : "Click → chọn từ vựng";
         _lblStatus.ForeColor = Color.FromArgb(160, 160, 160);
     }
 
