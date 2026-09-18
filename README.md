@@ -2,6 +2,8 @@
 
 Portable always-on-top Windows widget that rotates **HSK Chinese → Vietnamese** vocabulary and quizzes you with four multiple-choice answers. One self-contained `.exe`, no installer, no Administrator rights.
 
+**Hướng dẫn tiếng Việt (cài đặt + dùng hàng ngày):** [HUONG-DAN.md](HUONG-DAN.md)
+
 ## Run (Windows)
 
 Publish a single file:
